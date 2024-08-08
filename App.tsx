@@ -1,118 +1,139 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Image, ActivityIndicator } from 'react-native';
+import Tts from 'react-native-tts';
+import { Picker } from '@react-native-picker/picker';
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+const AIHighTechAssistant = () => {
+  const [sentence, setSentence] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [voices, setVoices] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState('');
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+  useEffect(() => {
+    const fetchVoices = async () => {
+      try {
+        const availableVoices = await Tts.voices();
+        setVoices(availableVoices);
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+        if (availableVoices.length > 0) {
+          setSelectedVoice(availableVoices[0].id); // Default to the first available voice
+          Tts.setDefaultVoice(availableVoices[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching voices:', error);
+      }
+    };
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+    fetchVoices();
+  }, []);
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  useEffect(() => {
+    const fetchSentence = async () => {
+      try {
+        const response = await fetch('https://actions.thinkingai.in/api/assistant');
+        const data = await response.json();
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+        if (data && data.sentence) {
+          setSentence(data.sentence);
+          Tts.speak(data.sentence);
+          setError(null);
+        } else {
+          throw new Error('Invalid response format');
+        }
+      } catch (error) {
+        console.error('Error fetching sentence:', error);
+        setError('Error fetching sentence. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSentence();
+    const interval = setInterval(fetchSentence, 5000);
+
+    return () => clearInterval(interval); // Cleanup interval on unmount
+  }, []);
+
+  const handleVoiceChange = (voiceId) => {
+    setSelectedVoice(voiceId);
+    Tts.setDefaultVoice(voiceId);
   };
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0f0" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
+    <View style={styles.container}>
+      <Image
+        source={require('./assets/ai_assistant.png')}
+        style={styles.image}
       />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      <Picker
+        selectedValue={selectedVoice}
+        onValueChange={(itemValue) => handleVoiceChange(itemValue)}
+        style={styles.picker}
+      >
+        {voices.map((voice) => (
+          <Picker.Item key={voice.id} label={voice.name} value={voice.id} />
+        ))}
+      </Picker>
+      <Text style={styles.sentence}>{sentence}</Text>
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+  container: {
+    flex: 1,
+    backgroundColor: '#0a0a0a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
   },
-  sectionTitle: {
+  image: {
+    width: 150,
+    height: 150,
+    marginBottom: 30,
+    borderRadius: 75,
+    borderColor: '#0f0',
+    borderWidth: 2,
+    shadowColor: '#0f0',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 10,
+  },
+  picker: {
+    width: '100%',
+    color: '#0f0',
+    backgroundColor: '#333',
+    marginVertical: 20,
+  },
+  sentence: {
+    color: '#0f0',
     fontSize: 24,
-    fontWeight: '600',
+    textAlign: 'center',
+    margin: 20,
   },
-  sectionDescription: {
-    marginTop: 8,
+  errorText: {
+    color: 'red',
     fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
+    textAlign: 'center',
+    margin: 20,
   },
 });
 
-export default App;
+export default AIHighTechAssistant;
